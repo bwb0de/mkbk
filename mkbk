@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+
+
+
+"""
+
+Script de backup que usa o rsync para automatizar processo de cópia de segurança e restauração de arquivos.
+
+Usage:
+    mkbk ( config ) <profile> source <sources>...
+    mkbk ( config ) <profile> destination <destination>
+    mkbk ( list ) 
+    mkbk ( purge ) <profile>
+    mkbk ( first-bk ) <profile>
+    mkbk ( incremental ) <profile>
+    mkbk ( restore ) <profile>
+    mkbk ( sync ) <profile>
+
+Options:
+    --version
+
+"""
+
+
+import os
+import time
+
+from docopt import docopt
+from subprocess import getoutput
+from modules.mkbk_functions import *
+
+args = docopt(__doc__)
+
+
+def main():
+	create_config_files()
+	if args['config']:
+		if args['source']:
+			for folder in args['<sources>']:
+				insert_into_sources(folder, args['<profile>'])
+		
+		elif args['destination']:
+			set_target_folder(args['<destination>'], args['<profile>'])
+
+
+	elif args['list']:
+		get_all_profiles()
+
+
+	elif args['purge']:
+		purge_config_files(args['<profile>'])
+
+	elif args['first-bk']:
+		nfo = get_config_info(args['<profile>'])
+		bk_f, tg_f = nfo[0], nfo[1]
+		print('Você selecionou a opção "first"...')
+		print('Arquivos antigos do backup que inexistam na fonte serão apagados...')
+		op = input('Deseja prosseguir? (s/n): ')
+		if op == ('s' or 'S'):
+			for folder in bk_f:
+				print("Realizando backup do diretório: {}".format(folder))
+				os.system('rsync -urlHpog --delete --safe-links "{}" "{}/"'.format(folder, tg_f))
+			try:
+				os.system("kdialog --title 'mkbk' --passivepopup 'Backup concluído!' 7")
+			except: pass
+
+	elif args['incremental']:
+		nfo = get_config_info(args['<profile>'])
+		bk_f, tg_f = nfo[0], nfo[1]
+		for folder in bk_f:
+			print("Realizando backup do diretório: {}".format(folder))
+			os.system('rsync -urlHpog --safe-links "{}" "{}"/'.format(folder, tg_f))
+		try:
+			os.system("kdialog --title 'mkbk' --passivepopup 'Backup concluído!' 7")
+		except: pass
+
+
+	elif args['restore']:
+		nfo = get_config_info(args['<profile>'])
+		bk_f, tg_f = nfo[0], nfo[1]
+		for folder in bk_f:
+			tmp_source = tg_f+'/'+folder.split('/')[-1]
+			tmp_target = folder
+			print("Realizando restauração do diretório: {}".format(folder))
+			os.system('rsync -urlHpog --safe-links "{}/" "{}/"'.format(tmp_source, tmp_target))
+		try:
+			os.system("kdialog --title 'mkbk' --passivepopup 'Restauração concluída!' 7")
+		except: pass
+
+	elif args['sync']:
+		nfo = get_config_info(args['<profile>'])
+		bk_f, tg_f = nfo[0], nfo[1]
+		for folder in bk_f:
+			tmp_source = tg_f+'/'+folder.split('/')[-1]
+			tmp_target = folder
+			print("Realizando sincronização do diretório: {}".format(folder))
+			os.system('rsync -urlHpog --safe-links "{}/" "{}/"'.format(tmp_source, tmp_target))
+			os.system('rsync -urlHpog --safe-links "{}" "{}/"'.format(folder, tg_f))
+		try:
+			os.system("kdialog --title 'mkbk' --passivepopup 'Sincronização concluída!' 7")
+		except: pass
+
+
+if __name__ == '__main__':
+	main()
